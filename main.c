@@ -1,6 +1,8 @@
 #include "alloc.h"
 
 int main(){
+    init();
+
     void* a = custom_malloc(10);
     void* b = custom_malloc(30);
     void* c = custom_malloc(20);
