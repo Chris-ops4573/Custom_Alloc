@@ -17,6 +17,6 @@ int main(){
     void* f = custom_malloc(3);
     show_heap();
 
-    void* big = custom_malloc(1023*1024);
+    void* big = custom_malloc(1024*1024);
     show_heap();
 }

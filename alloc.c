@@ -1,11 +1,12 @@
 #include <stdio.h>
+#include <unistd.h>
 #include "alloc.h"
 
-#define heap_size 1024*1024
 #define num_bins 10
 #define largest_block 2048
 
-static char heap[heap_size]; 
+static char* heap_start = NULL;
+static char* heap_end = NULL; 
 static int ptr = 0;
 
 typedef struct Header{
@@ -28,32 +29,9 @@ typedef struct Bin{
 
 static Bin size_bins[num_bins];
 
-void init(){
-    for(int i = 0; i < num_bins; i++){
-        size_bins[i].head.size = -1;
-        size_bins[i].head.free = -1;
-        size_bins[i].tail.size = -1;
-        size_bins[i].tail.free = -1;
-
-        size_bins[i].head.free_prev = NULL;
-        size_bins[i].head.free_next = &(size_bins[i].tail);
-
-        size_bins[i].tail.free_next = NULL;
-        size_bins[i].tail.free_prev = &(size_bins[i].head);
-    }
-}
-
-void show_heap(){
-    char* trav = heap;
-    
-    printf("-----*-----\n");
-    while(trav < heap + ptr){
-        Header* header = (Header*)trav;
-
-        printf("[H]__%d__[F]\n", header->size);
-
-        trav += sizeof(Header) + header->size + sizeof(Footer);
-    }
+void helper_extend_heap(int size){
+    sbrk(size);
+    heap_end = sbrk(0);
 }
 
 // Effectively constant time
@@ -81,10 +59,10 @@ void* helper_coalasce(void* p){
     Footer* prev_footer = NULL;
     Header* next_header = NULL;
 
-    if((char*)curr_header != heap){
+    if((char*)curr_header != heap_start){
         prev_footer = (Footer*)((char*)curr_header - sizeof(Footer));
     }
-    if((char*)curr_header + sizeof(Header) + curr_header->size + sizeof(Footer) < heap + ptr){
+    if((char*)curr_header + sizeof(Header) + curr_header->size + sizeof(Footer) < heap_start + ptr){
         next_header = (Header*)((char*)curr_header + sizeof(Header) + curr_header->size + sizeof(Footer));
     }
 
@@ -123,6 +101,37 @@ void* helper_coalasce(void* p){
     }
 
     return (void*) curr_header;
+}
+
+void init(){
+    heap_start = sbrk(0);
+    helper_extend_heap(1024*1024);
+
+    for(int i = 0; i < num_bins; i++){
+        size_bins[i].head.size = -1;
+        size_bins[i].head.free = -1;
+        size_bins[i].tail.size = -1;
+        size_bins[i].tail.free = -1;
+
+        size_bins[i].head.free_prev = NULL;
+        size_bins[i].head.free_next = &(size_bins[i].tail);
+
+        size_bins[i].tail.free_next = NULL;
+        size_bins[i].tail.free_prev = &(size_bins[i].head);
+    }
+}
+
+void show_heap(){
+    char* trav = heap_start;
+    
+    printf("-----*-----\n");
+    while(trav < heap_start + ptr){
+        Header* header = (Header*)trav;
+
+        printf("[H]__%d__[F]\n", header->size);
+
+        trav += sizeof(Header) + header->size + sizeof(Footer);
+    }
 }
 
 void* custom_malloc(int req_size){
@@ -192,19 +201,19 @@ void* custom_malloc(int req_size){
         return(void*) ((char*)found + sizeof(Header));
     }
 
-    if(ptr + sizeof(Header) + req_size + sizeof(Footer) >= heap_size){
-        return NULL;
+    while(heap_start + ptr + sizeof(Header) + req_size + sizeof(Footer) >= heap_end){
+        helper_extend_heap(1024*1024);
     }
 
-    Header* header = (Header*) &heap[ptr];
+    Header* header = (Header*)(heap_start + ptr);
     header->size = req_size;
     header->free = 0;
     ptr += sizeof(Header);
 
-    char* p = &heap[ptr];
+    char* p = heap_start + ptr;
     ptr += req_size;
 
-    Footer* footer = (Footer*) &heap[ptr];
+    Footer* footer = (Footer*)(heap_start + ptr);
     footer->size = req_size;
     footer->free = 0;
     ptr += sizeof(Footer);
