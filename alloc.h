@@ -5,6 +5,7 @@ void init();
 void show_heap();
 
 void* custom_malloc(int req_size);
+void* custom_realloc(int req_size, void* p);
 void custom_free(void* p);
 
 #endif

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include "alloc.h"
 
 #define num_bins 10
@@ -219,6 +220,86 @@ void* custom_malloc(int req_size){
     ptr += sizeof(Footer);
 
     return (void*) p;
+}
+
+void* custom_realloc(int req_size, void* p){
+    req_size = (req_size + 7) & ~7;
+
+    if(req_size == 0){
+        custom_free(p);
+        return NULL;
+    }
+
+    // Size already big enough
+    Header* initial_header = (Header*)((char*)p - sizeof(Header));
+    if(initial_header->size >= req_size){
+        return p;
+    }
+
+    // Requires next block
+    Header* next_header = (Header*)((char*)p + initial_header->size + sizeof(Footer));
+    if((char*)next_header < heap_start + ptr && next_header->free == 1 && initial_header->size + sizeof(Footer) + sizeof(Header) + next_header->size >= req_size){
+        // Clearing from free bins
+        Header* next_header_P = next_header->free_prev;
+        Header* next_header_N = next_header->free_next;
+
+        next_header_P->free_next = next_header_N;
+        next_header_N->free_prev = next_header_P;
+
+        next_header->free_next = NULL;
+        next_header->free_prev = NULL;
+
+        // Heap resizing
+        Footer* next_footer = (Footer*)((char*)next_header + sizeof(Header) + next_header->size);
+        int merged_size = initial_header->size + sizeof(Footer) + sizeof(Header) + next_header->size;
+        initial_header->size = merged_size;
+        next_footer->size = merged_size;
+
+        initial_header->free = 0;
+        next_footer->free = 0;
+
+        // Splitting up remaining chunk if big enough left to be marked free
+        if(initial_header->size >= sizeof(Header) + sizeof(Footer) + req_size + 8){
+            // Splitting the heap
+            int remain_size = initial_header->size - sizeof(Footer) - sizeof(Header) - req_size;
+            int remain_index = helper_get_range(remain_size);
+
+            initial_header->size = req_size;
+            initial_header->free = 0;
+            Footer* initial_footer = (Footer*)((char*)initial_header + sizeof(Header) + req_size);
+            initial_footer->size = req_size;
+            initial_footer->free = 0;
+
+            Header* remain_header = (Header*)((char*)initial_footer + sizeof(Footer));
+            remain_header->free = 1;
+            remain_header->size = remain_size;
+
+            Footer* remain_footer = (Footer*)((char*)remain_header + sizeof(Header) + remain_size);
+            remain_footer->free = 1;
+            remain_footer->size = remain_size;
+
+            // Adding remainder to free bin
+            Header* bin_index_head = &(size_bins[remain_index].head);
+            Header* bin_index_head_N = bin_index_head->free_next;
+
+            bin_index_head->free_next = remain_header;
+
+            remain_header->free_prev = bin_index_head;
+            remain_header->free_next = bin_index_head_N;
+
+            bin_index_head_N->free_prev = remain_header;
+        }
+
+        return (void*)((char*)initial_header + sizeof(Header));
+    }
+
+    //If next block is not big enough change location to big enough block and free current allocation
+    void* new_location = custom_malloc(req_size);
+    memcpy(new_location, p, initial_header->size);
+
+    custom_free(p);
+    
+    return new_location;
 }
 
 void custom_free(void* p){
