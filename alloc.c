@@ -128,6 +128,9 @@ void show_heap(){
     printf("-----*-----\n");
     while(trav < heap_start + ptr){
         Header* header = (Header*)trav;
+        if(header->free == 1){
+            printf("* ");
+        }
 
         printf("[H]__%d__[F]\n", header->size);
 
