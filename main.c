@@ -21,8 +21,6 @@ int main(){
 
     char* e = custom_malloc(2);
 
-    // Memory curroption/invalid access
-    e[49] = 'a';
     custom_free(e);
     show_heap();
 }
