@@ -4,8 +4,9 @@
 #include <string.h>
 #include "alloc.h"
 
-#define num_bins 10
-#define largest_block 2048
+#define NUM_BINS 41
+#define largest_8_block 256
+#define largest_block 65536
 #define MAGIC 0xCAFEBABE
 
 #define MAGIC_VALIDATE(h)                                       \
@@ -14,7 +15,7 @@
             fprintf(stderr, "Heap curroption, magic number\n"); \
             exit(EXIT_FAILURE);                                 \
         }                                                       \
-    } while (0)                                                 \
+    } while (0)                                                 
 
 static char* heap_start = NULL;
 static char* heap_end = NULL; 
@@ -40,7 +41,7 @@ typedef struct Bin{
     Header tail;
 } Bin;
 
-static Bin size_bins[num_bins];
+static Bin size_bins[NUM_BINS];
 
 void helper_extend_heap(int size){
     sbrk(size);
@@ -50,15 +51,18 @@ void helper_extend_heap(int size){
 // Effectively constant time
 int helper_get_range(int req_size){
     if(req_size > largest_block){
-        return 9;
+        return 40;
     }
 
-    int index = 0;
-    int upper = 16;
+    if(req_size <= largest_8_block){
+        return req_size/8 - 1;
+    }
 
+    int upper = 512;
+    int index = 32;
     while(req_size >= upper){
-        index++;
         upper <<= 1;
+        index++;
     }
 
     return index;
@@ -127,7 +131,7 @@ void init(){
     heap_start = sbrk(0);
     helper_extend_heap(1024*1024);
 
-    for(int i = 0; i < num_bins; i++){
+    for(int i = 0; i < NUM_BINS; i++){
         size_bins[i].head.size = -1;
         size_bins[i].head.free = -1;
         size_bins[i].tail.size = -1;
@@ -162,12 +166,27 @@ void show_heap(){
     }
 }
 
+void validate_heap(){
+    char* trav = heap_start;
+
+    while(trav < heap_start + ptr){
+        Header* head = (Header*) trav;
+        Footer* foot = (Footer*)(trav + sizeof(Header) + head->size);
+
+        if(head->size != foot->size || head->free != foot->free){
+            printf("Mismatch: H: %d, %d & F: %d, %d\n", head->free, head->size, foot->free, foot->size);
+        }
+
+        trav += sizeof(Header) + head->size + sizeof(Footer);
+    }
+}
+
 void* custom_malloc(int req_size){
     req_size = (req_size + 7) & ~7;
     int idx = helper_get_range(req_size);
 
     Header* found = NULL;
-    while(!found && idx < num_bins){
+    while(!found && idx < NUM_BINS){
         Header* it = size_bins[idx].head.free_next;
 
         while(!found && it != &(size_bins[idx].tail)){
@@ -196,6 +215,9 @@ void* custom_malloc(int req_size){
         found->free = 0;
         found->free_next = NULL;
         found->free_prev = NULL;
+
+        Footer* found_old_footer = (Footer*) ((char*)found + sizeof(Header) + found->size);
+        found_old_footer->free = 0;
 
         if(found->size >= req_size + sizeof(Header) + sizeof(Footer) + 8){
             int remain_size = found->size - req_size - sizeof(Header) - sizeof(Footer);
