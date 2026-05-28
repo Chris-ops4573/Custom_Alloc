@@ -6,7 +6,7 @@ A custom heap allocator written in C, implementing `malloc`, `free`, and `reallo
 
 ## How It Works
 
-The allocator uses a **segregated free list** architecture with boundary tags, the same fundamental design as production allocators like glibc.
+The allocator uses a **segregated free list** architecture with boundary tags.
 
 ### Memory Layout
 
@@ -16,7 +16,7 @@ Every allocation is wrapped in a header and footer:
 [Header | size | free | magic | prev* | next*] [user data] [Footer | size | free | magic]
 ```
 
-This lets the allocator find adjacent blocks in O(1) time for coalescing, and validate heap integrity via a magic number (`0xCAFEBABE`).
+This doubly linked list lets the allocator find adjacent blocks in O(1) time for coalescing, and validate heap integrity via a magic number (`0xCAFEBABE`).
 
 ### Size Bins
 
@@ -49,9 +49,7 @@ Custom allocator:  ~0.058s
 glibc allocator:   ~0.040s
 ```
 
-Ratio: approximately **1.5x glibc**. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
-
-*Benchmarks run on an x86-64 Linux machine. Results will vary by hardware.*
+Summary: 1.5x glibc. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
 
 ---
 
