@@ -44,11 +44,11 @@ On `malloc`, the allocator finds the correct bin for the requested size and sear
 Tested against glibc on a mixed workload of 10,000,000 random `malloc`/`free` operations with sizes from 1–2048 bytes.
 
 ```
-Custom allocator:  ~0.054s
+Custom allocator:  ~0.040s
 glibc allocator:   ~0.037s
 ```
 
-Summary: >1.5x glibc. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
+Summary: >1.1x glibc. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
 
 ---
 
