@@ -6,7 +6,7 @@ A custom heap allocator written in C, implementing `malloc`, `free`, and `reallo
 
 ## How It Works
 
-The allocator uses a **segregated free list** architecture with boundary tags.
+The allocator uses a segregated free list architecture with boundary tags.
 
 ### Memory Layout
 
@@ -16,7 +16,7 @@ Every allocation is wrapped in a header and footer:
 [Header | size | free | magic | prev* | next*] [user data] [Footer | size | free | magic]
 ```
 
-This doubly linked list lets the allocator find adjacent blocks in O(1) time for coalescing, and validate heap integrity via a magic number (`0xCAFEBABE`).
+The header's `prev*` and `next*` pointers form a doubly linked list within each free bin, letting the allocator splice blocks in and out in O(1) time. The footer mirrors `size` and `free` so that a block can locate its predecessor in O(1) for coalescing. Both carry `0xCAFEBABE` for integrity validation.
 
 ### Size Bins
 
@@ -34,22 +34,21 @@ On `malloc`, the allocator finds the correct bin for the requested size and sear
 
 - **Immediate coalescing** — adjacent free blocks are merged on every `free`, preventing fragmentation buildup
 - **Block splitting** — oversized free blocks are split, with the remainder returned to its bin
-- **Magic number validation** — every header and footer carries `0xCAFEBABE`; mismatches abort with an error, catching corruption and double-frees early
+- **Magic number validation** — every header and footer carries `0xCAFEBABE`; mismatches abort with an error, catching heap corruption early; double-frees are caught by a separate explicit check in `custom_free`
 - **Heap extension** — the heap grows automatically in 1MB increments via `sbrk` when no suitable free block exists
-
 
 ---
 
 ## Benchmark Results
 
-Tested against glibc on a mixed workload of 1,000,000 random `malloc`/`free` operations with sizes from 1–2048 bytes.
+Tested against glibc on a mixed workload of 10,000,000 random `malloc`/`free` operations with sizes from 1–2048 bytes.
 
 ```
-Custom allocator:  ~0.058s
-glibc allocator:   ~0.040s
+Custom allocator:  ~0.054s
+glibc allocator:   ~0.037s
 ```
 
-Summary: 1.5x glibc. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
+Summary: >1.5x glibc. At lower iteration counts (≤1000 ops) the custom allocator matches or beats glibc, since glibc's tcache has higher setup overhead relative to work done.
 
 ---
 
@@ -79,7 +78,7 @@ gcc -O2 -o main main.c alloc.c
 gcc -O2 -o bench bench.c alloc.c
 ./bench
 
-# Debug build — enables magic number validation on every operation
+# Debug build — enables full heap validation on every operation
 gcc -O2 -DDEBUG -o main_debug main.c alloc.c
 ```
 

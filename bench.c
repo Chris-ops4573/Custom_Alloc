@@ -4,7 +4,7 @@
 #include <string.h>
 #include "alloc.h"
 
-#define OPS 1000
+#define OPS 10000000
 
 int main(){
     init();

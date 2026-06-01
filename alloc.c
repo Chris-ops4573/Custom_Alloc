@@ -15,7 +15,7 @@
             fprintf(stderr, "Heap curroption, magic number\n"); \
             exit(EXIT_FAILURE);                                 \
         }                                                       \
-    } while (0)                                                 
+    } while (0)
 
 static char* heap_start = NULL;
 static char* heap_end = NULL; 
@@ -42,6 +42,27 @@ typedef struct Bin{
 } Bin;
 
 static Bin size_bins[NUM_BINS];
+
+void validate_heap(){
+    char* trav = heap_start;
+
+    while(trav < heap_start + ptr){
+        Header* head = (Header*) trav;
+        Footer* foot = (Footer*)(trav + sizeof(Header) + head->size);
+
+        if(head->size != foot->size || head->free != foot->free){
+            printf("Mismatch: H: %d, %d & F: %d, %d\n", head->free, head->size, foot->free, foot->size);
+        }
+
+        trav += sizeof(Header) + head->size + sizeof(Footer);
+    }
+}
+
+#ifdef DEBUG
+    #define VALIDATE() validate_heap()
+#else 
+    #define VALIDATE() ((void) 0)
+#endif
 
 void helper_extend_heap(int size){
     sbrk(size);
@@ -166,21 +187,6 @@ void show_heap(){
     }
 }
 
-void validate_heap(){
-    char* trav = heap_start;
-
-    while(trav < heap_start + ptr){
-        Header* head = (Header*) trav;
-        Footer* foot = (Footer*)(trav + sizeof(Header) + head->size);
-
-        if(head->size != foot->size || head->free != foot->free){
-            printf("Mismatch: H: %d, %d & F: %d, %d\n", head->free, head->size, foot->free, foot->size);
-        }
-
-        trav += sizeof(Header) + head->size + sizeof(Footer);
-    }
-}
-
 void* custom_malloc(int req_size){
     req_size = (req_size + 7) & ~7;
     int idx = helper_get_range(req_size);
@@ -275,6 +281,7 @@ void* custom_malloc(int req_size){
     footer->magic = MAGIC;
     ptr += sizeof(Footer);
 
+    VALIDATE();
     return (void*)p;
 }
 
@@ -355,6 +362,7 @@ void* custom_realloc(int req_size, void* p){
             bin_index_head_N->free_prev = remain_header;
         }
 
+        VALIDATE();
         return (void*)((char*)initial_header + sizeof(Header));
     }
 
@@ -395,4 +403,6 @@ void custom_free(void* p){
     new_header->free_next = next_head;
 
     next_head->free_prev = new_header;
+
+    VALIDATE();
 }
